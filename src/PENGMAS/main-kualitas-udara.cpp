@@ -36,7 +36,7 @@ const char spreadsheetId[] = "YOUR SPREADSHEET ID";
 
 // Making modbus object
 ModbusRTUMaster modbus(mySerial, DERE_PIN);
-uint16_t holdingRegisterGas[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+uint16_t holdingRegisterGas[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 uint16_t holdingRegisterWindSpeed[1] = {0};
 uint16_t holdingRegisterWindDirection[1] = {0};
 uint16_t holdingRegisterSolarRadiation[1] = {0};
@@ -70,6 +70,13 @@ void readGas();
 void syncLocalTime();
 // String getFormattedDate();
 void processError();
+float convertPmTen(float value);
+float convertPmTwo(float value);
+float convertSoTwo(float value);
+float convertCo(float value);
+float convertOThree(float value);
+float convertNo2(float value);
+float convertHc(float value);
 
 // Setting interval time
 unsigned long previousMillis = 0;
@@ -183,57 +190,7 @@ void loop()
 //     }
 // }
 
-// RK300 Sensor
-void readGas()
-{
-  if (modbus.readHoldingRegisters(5, 0, holdingRegisterGas, 9))
-  {
-    so2 = convertSoTwo(holdingRegisterGas[0]);
-    o3 = convertOThree(holdingRegisterGas[1]);
-    o2 = convertHc(holdingRegisterGas[2]);
-    co2 = convertCo(holdingRegisterGas[3]);
-    no2 = convertNo2(holdingRegisterGas[4]);
-    pm2 = convertPmTwo(holdingRegisterGas[5]);
-    pm10 = convertPmTen(holdingRegisterGas[6]);
-
-    Serial.println("================================================");
-    for (int i = 0; i <= 9; i++)
-    {
-      Serial.print("DATA-");
-      Serial.print(i);
-      Serial.print(": ");
-      Serial.println(holdingRegisterGas[i]);
-    }
-
-    // Serial.print("SO2: ");
-    // Serial.print(so2);
-    // Serial.println(" ppm");
-
-    // Serial.print("O3: ");
-    // Serial.print(o3);
-    // Serial.println(" ppm");
-
-    // Serial.print("O2: ");
-    // Serial.print(o2);
-    // Serial.println(" %");
-
-    // Serial.print("CO2: ");
-    // Serial.print(co2);
-    // Serial.println(" ppm");
-
-    // Serial.print("NO2: ");
-    // Serial.print(no2);
-    // Serial.println(" ppm");
-
-    // Serial.print("PM2.5~10: ");
-    // Serial.print(pm);
-    // Serial.println(" ug/m3");
-  }
-  else
-    processError();
-}
-
-int convertPmTen(int value)
+float convertPmTen(float value)
 {
   if (value >= 0 && value <= 50)
   {
@@ -242,19 +199,22 @@ int convertPmTen(int value)
   else if (value >= 51 && value <= 100)
   {
     return 150;
-  } else if (value >= 101 && value <= 200)
+  }
+  else if (value >= 101 && value <= 200)
   {
     return 350;
-  }else if (value >= 201 && value <= 300)
+  }
+  else if (value >= 201 && value <= 300)
   {
     return 420;
-  } else if (value >= 300)
+  }
+  else if (value >= 300)
   {
     return 500;
   }
   else
   {
-   return 0;
+    return 0;
   }
 }
 // Convert PM2.5
@@ -267,23 +227,26 @@ float convertPmTwo(float value)
   else if (value >= 51 && value <= 100)
   {
     return 55.4;
-  } else if (value >= 101 && value <= 200)
+  }
+  else if (value >= 101 && value <= 200)
   {
     return 150.4;
-  }else if (value >= 201 && value <= 300)
+  }
+  else if (value >= 201 && value <= 300)
   {
     return 250.4;
-  } else if (value >= 300)
+  }
+  else if (value >= 300)
   {
     return 500;
   }
   else
   {
-   return 0;
+    return 0;
   }
 }
 // Convert SO2
-int convertSoTwo(int value)
+float convertSoTwo(float value)
 {
   if (value >= 0 && value <= 50)
   {
@@ -292,23 +255,26 @@ int convertSoTwo(int value)
   else if (value >= 51 && value <= 100)
   {
     return 180;
-  } else if (value >= 101 && value <= 200)
+  }
+  else if (value >= 101 && value <= 200)
   {
     return 400;
-  }else if (value >= 201 && value <= 300)
+  }
+  else if (value >= 201 && value <= 300)
   {
     return 800;
-  } else if (value >= 300)
+  }
+  else if (value >= 300)
   {
     return 1200;
   }
   else
   {
-   return 0;
+    return 0;
   }
 }
 // Convert CO
-int convertCo(int value)
+float convertCo(float value)
 {
   if (value >= 0 && value <= 50)
   {
@@ -317,24 +283,27 @@ int convertCo(int value)
   else if (value >= 51 && value <= 100)
   {
     return 8000;
-  } else if (value >= 101 && value <= 200)
+  }
+  else if (value >= 101 && value <= 200)
   {
     return 15000;
-  }else if (value >= 201 && value <= 300)
+  }
+  else if (value >= 201 && value <= 300)
   {
     return 30000;
-  } else if (value >= 300)
+  }
+  else if (value >= 300)
   {
     return 45000;
   }
   else
   {
-   return 0;
+    return 0;
   }
 }
 
 // Convert O3
-int convertOThree(int value)
+float convertOThree(float value)
 {
   if (value >= 0 && value <= 50)
   {
@@ -343,24 +312,27 @@ int convertOThree(int value)
   else if (value >= 51 && value <= 100)
   {
     return 235;
-  } else if (value >= 101 && value <= 200)
+  }
+  else if (value >= 101 && value <= 200)
   {
     return 400;
-  }else if (value >= 201 && value <= 300)
+  }
+  else if (value >= 201 && value <= 300)
   {
     return 800;
-  } else if (value >= 300)
+  }
+  else if (value >= 300)
   {
     return 1000;
   }
   else
   {
-   return 0;
+    return 0;
   }
 }
 
 // Convert NO2
-int convertNo2(int value)
+float convertNo2(float value)
 {
   if (value >= 0 && value <= 50)
   {
@@ -369,24 +341,27 @@ int convertNo2(int value)
   else if (value >= 51 && value <= 100)
   {
     return 200;
-  } else if (value >= 101 && value <= 200)
+  }
+  else if (value >= 101 && value <= 200)
   {
     return 1130;
-  }else if (value >= 201 && value <= 300)
+  }
+  else if (value >= 201 && value <= 300)
   {
     return 2260;
-  } else if (value >= 300)
+  }
+  else if (value >= 300)
   {
     return 3000;
   }
   else
   {
-   return 0;
+    return 0;
   }
 }
 
 // Convert HC
-int convertHc(int value)
+float convertHc(float value)
 {
   if (value >= 0 && value <= 50)
   {
@@ -395,20 +370,91 @@ int convertHc(int value)
   else if (value >= 51 && value <= 100)
   {
     return 100;
-  } else if (value >= 101 && value <= 200)
+  }
+  else if (value >= 101 && value <= 200)
   {
     return 215;
-  }else if (value >= 201 && value <= 300)
+  }
+  else if (value >= 201 && value <= 300)
   {
     return 432;
-  } else if (value >= 300)
+  }
+  else if (value >= 300)
   {
     return 648;
   }
   else
   {
-   return 0;
+    return 0;
   }
+}
+
+// RK300 Sensor
+void readGas()
+{
+  if (modbus.readHoldingRegisters(5, 0, holdingRegisterGas, 16))
+  {
+    // pm10 = convertPmTen(holdingRegisterGas[1]);
+    // pm2 = convertPmTwo(holdingRegisterGas[0]);
+    // so2 = convertSoTwo(holdingRegisterGas[8]/ 10) ;
+    // co2 = convertCo(holdingRegisterGas[6]);
+    // o3 = convertOThree(holdingRegisterGas[10]/ 10) ;
+    // no2 = convertNo2(holdingRegisterGas[9]/ 10) ;
+    // o2 = convertHc(holdingRegisterGas[7]/ 10) ;
+    pm10 = holdingRegisterGas[1];
+    pm2 = holdingRegisterGas[0]; // Tanpa Konversi
+    so2 = holdingRegisterGas[8] / 10;
+    co2 = holdingRegisterGas[6];
+    o3 = holdingRegisterGas[10] / 10;
+    no2 = holdingRegisterGas[9] / 10;
+    // o2 = holdingRegisterGas[7];
+
+    Serial.println("================================================");
+    // for (int i = 0; i <= 9; i++)
+    // {
+    //   Serial.print("DATA-");
+    //   Serial.print(i);
+    //   Serial.print(": ");
+    //   Serial.println(holdingRegisterGas[i]);
+    // }
+
+    Serial.print("PM2.5: ");
+    Serial.print(pm2);
+    Serial.println(" ug/m3");
+    Serial.println(holdingRegisterGas[1]);
+
+    Serial.print("PM10: ");
+    Serial.print(pm10);
+    Serial.println(" ug/m3");
+    Serial.println(holdingRegisterGas[0]);
+
+    Serial.print("SO2: ");
+    Serial.print(so2);
+    Serial.println(" ppm");
+    Serial.println(holdingRegisterGas[8] / 10);
+
+    Serial.print("CO2: ");
+    Serial.print(co2);
+    Serial.println(" ppm");
+    Serial.println(holdingRegisterGas[6]);
+
+    Serial.print("O3: ");
+    Serial.print(o3);
+    Serial.println(" ppm");
+    Serial.println(holdingRegisterGas[10]/ 10);
+
+    Serial.print("NO2: ");
+    Serial.print(no2);
+    Serial.println(" ppm");
+    Serial.println(holdingRegisterGas[9]/10);
+
+    // Serial.print("O2: ");
+    // Serial.print(o2);
+    // Serial.println(" %");
+    // Serial.println(holdingRegisterGas[7]);
+  }
+  else
+    processError();
 }
 
 // RK100-02 Sensor
