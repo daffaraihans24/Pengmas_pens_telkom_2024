@@ -22,9 +22,10 @@ const long gmtOffset_sec = 6 * 3600;  //WIB Time, Indonesia
 const int daylightOffset_sec = 3600;
 
 // Supabase API credentials
-const char* supabaseUrl = "yoursupabase url";
-const char* supabaseKey = "your api key";
-String endpoint = "your end point";
+const char* supabaseUrl = "https://supabase.co";
+const char* supabaseKey = "YOUR SUPABASE KEY";
+                          
+String endpoint = "/rest/v1/sensor_data";
 
 // Making modbus object
 ModbusRTUMaster modbus(mySerial, dePin);
@@ -32,7 +33,8 @@ uint16_t holdingRegisterWindSpeed [1] = {0};    // The data read from the wind s
 uint16_t holdingRegisterWindDirection [1] = {0}; // The data read from the wind direction register
 uint16_t holdingRegisterSolarRadiation [1]= {0}; // The data read from the solar radiation register
 uint16_t holdingRegisterClimate [3]= {0,0,0}; // The data read from the climate registers
-uint16_t holdingRegisterRainfall [2]= {0,0}; // The data read from the rainfall registers
+uint16_t holdingRegisterRainfall [2]= {0,0}; // The data read from the climate registers
+uint16_t holdingRegisterGas[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 float windSpeed;
 float windDirection;
@@ -41,6 +43,13 @@ float temperature;
 float humidity;
 float pressure;
 float rainfall;
+float PM2;
+float PM10;
+float CO2;
+float O2;
+float SO2;
+float NO2;
+float O3;
 
 // Function Declare
 void postHTTP();
@@ -49,6 +58,7 @@ void readWindDirection();
 void readSolarRadiation();
 void readClimateData();
 void readRainfall();
+void readGas();
 void connectWifi();
 void AutoReconnectWiFi();
 void syncLocalTime();
@@ -83,6 +93,8 @@ void loop() {
     delay(300);
     readRainfall();
     delay(300);
+    readGas();
+    delay(300);
     postHTTP();
   }
 }
@@ -104,6 +116,14 @@ void postHTTP() {
   buff["temperature"] = String(temperature);
   buff["humidity"] = String(humidity);
   buff["pressure"] = String(pressure);
+  buff["rainfall"] = String(rainfall);
+  buff["PM2.5"] = String(PM2);
+  buff["PM10"] = String(PM10);
+  buff["CO2"] = String(CO2);
+  buff["O2"] = String(O2);
+  buff["SO2"] = String(SO2);
+  buff["NO2"] = String(NO2);
+  buff["O3"] = String(O3);
 
   serializeJson(buff, jsonParams);
   http.begin(url);
@@ -111,7 +131,7 @@ void postHTTP() {
   int statusCode = http.POST(jsonParams);
   response = http.getString();
 
-  if (statusCode == 200) {
+  if (statusCode == 201) {
   Serial.println("Post Method Success!");
 
   } else {
@@ -175,7 +195,7 @@ void readClimateData() {
  else processError();
 }
 
-// RK400-04 Sensor
+// RK110-02 Sensor
 void readRainfall() {
   if(modbus.readHoldingRegisters(4, 0, holdingRegisterRainfall, 2)){ //readHoldingRegisters(ID Slave, startAddress, buffer, quantity)
     rainfall = holdingRegisterRainfall[1] / 10;
@@ -184,6 +204,51 @@ void readRainfall() {
     Serial.println(" mm");
  }
  else processError();
+}
+
+//RK300-08
+void readGas()
+{
+  if (modbus.readHoldingRegisters(5, 0, holdingRegisterGas, 16)) //readHoldingRegisters(ID Slave, startAddress, buffer, quantity)
+  {
+    PM2 = holdingRegisterGas[0];
+    PM10 = holdingRegisterGas[1];
+    CO2 = holdingRegisterGas[6];
+    O2 = holdingRegisterGas[7]/10;
+    SO2 = holdingRegisterGas[8] / 10;
+    NO2 = holdingRegisterGas[9] / 10;
+    O3 = holdingRegisterGas[10]/10;
+
+    Serial.print("PM2.5: ");
+    Serial.print(PM2);
+    Serial.println(" ug/m3");
+
+    Serial.print("PM10: ");
+    Serial.print(PM10);
+    Serial.println(" ug/m3");
+
+    Serial.print("CO2: ");
+    Serial.print(CO2);
+    Serial.println(" ppm");
+
+    Serial.print("O2: ");
+    Serial.print(O2);
+    Serial.println(" %VOL");
+
+    Serial.print("SO2: ");
+    Serial.print(SO2);
+    Serial.println(" ppm");
+
+    Serial.print("NO2: ");
+    Serial.print(NO2);
+    Serial.println(" ppm");
+
+    Serial.print("O3: ");
+    Serial.print(O3);
+    Serial.println(" ppm");
+  }
+  else
+    processError();
 }
 
 void connectWifi() {
