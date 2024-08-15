@@ -1,14 +1,12 @@
 #include <Arduino.h>
 #include <WiFi.h>
-#include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <ModbusRTUMaster.h>
 #include <time.h>
 #include <HardwareSerial.h>
-#include <ESP_Google_Sheet_Client.h>
-#include <GS_SDHelper.h>
+#include <HTTPClient.h>
 
-//RS485 pin definition
+// RS485 pin definition
 const uint8_t DERE_PIN = 4;
 
 HardwareSerial mySerial(1);
@@ -16,31 +14,25 @@ const uint8_t RXpin = 16;
 const uint8_t TXpin = 17;
 
 // WiFi Declare
-String wifiSSID = "YOUR SSID ID";
-String wifiPassword = "YOUR SSID PASSWORD";
+String wifiSSID = "Xiaomi";
+String wifiPassword = "bijibijian";
 
 // NTP Configuration
 const char* ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = 6 * 3600;  //WIB Time, Indonesia
+const long gmtOffset_sec = 6 * 3600;  // WIB Time, Indonesia
 const int daylightOffset_sec = 3600;
 
-// Google Project ID
-#define PROJECT_ID "YOUR PROJECT ID"
-// Service Account's client email
-#define CLIENT_EMAIL "YOUR CLIENT EMAIL ID"
-// Service Account's private key
-const char PRIVATE_KEY[] PROGMEM = "-----BEGIN PRIVATE KEY-----\n-----END PRIVATE KEY-----\n";
-
-// The ID of the spreadsheet where you'll publish the data
-const char spreadsheetId[] = "YOUR SPREADSHEET ID";
-
+// Supabase API credentials
+const char* supabaseUrl = "https://fxmhhmvyattgrgdkbqbh.supabase.co";
+const char* supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ4bWhobXZ5YXR0Z3JnZGticWJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjI2MDQ5NzMsImV4cCI6MjAzODE4MDk3M30.Ev7Yr7xPc965XT4TCSystOf18pMViyKpQhTrBtyULzA";
+String endpoint = "/rest/v1/sensor_data";
 
 // Making modbus object
 ModbusRTUMaster modbus(mySerial, DERE_PIN);
-uint16_t holdingRegisterWindSpeed [1] = {0};
-uint16_t holdingRegisterWindDirection [1] = {0};
-uint16_t holdingRegisterSolarRadiation [1]= {0};
-uint16_t holdingRegisterClimate [3]= {0,0,0};
+uint16_t holdingRegisterWindSpeed[1] = {0};
+uint16_t holdingRegisterWindDirection[1] = {0};
+uint16_t holdingRegisterSolarRadiation[1] = {0};
+uint16_t holdingRegisterClimate[3] = {0, 0, 0};
 
 float windSpeed;
 float windDirection;
@@ -51,8 +43,6 @@ float pressure;
 
 // Function Declare
 void postHTTP();
-void postToGoogleSheets();
-void tokenStatusCallback(TokenInfo info);
 void readWindSpeed();
 void readWindDirection();
 void readSolarRadiation();
@@ -63,7 +53,7 @@ void syncLocalTime();
 String getFormattedDate();
 void processError();
 
-//Setting interval time
+// Setting interval time
 unsigned long previousMillis = 0;
 const long interval = 1000;
 
@@ -73,9 +63,6 @@ void setup() {
   modbus.setTimeout(1000);
   connectWifi();
   syncLocalTime();
-  GSheet.begin(CLIENT_EMAIL, PROJECT_ID, PRIVATE_KEY);
-  GSheet.setTokenCallback(tokenStatusCallback);
-  GSheet.setPrerefreshSeconds(10 * 60);
 }
 
 void loop() {
@@ -91,14 +78,13 @@ void loop() {
     delay(300);
     readClimateData();
     delay(300);
-    postToGoogleSheets();
-    //postHTTP();
+    postHTTP();
   }
 }
 
 void postHTTP() {
-  Serial.println("Sending data sensors...");
-  String url = "https://yourapi/api/sensor";
+  Serial.println("Sending sensor data...");
+  String url = String(supabaseUrl) + endpoint;
   HTTPClient http;
   String response;
 
@@ -106,109 +92,74 @@ void postHTTP() {
   String jsonParams;
   String formattedDate = getFormattedDate();
 
-  buff["date"] = formattedDate;
-  buff["windSpeed"] = String(windSpeed);
-  buff["windDirection"] = String(windDirection);
-  buff["solarRadiation"] = String(solarRadiation);
-  buff["temperature"] = String(temperature);
-  buff["humidity"] = String(humidity);
-  buff["pressure"] = String(pressure);
+  buff["timestamp"] = formattedDate;
+  buff["wind_speed"] = windSpeed;
+  buff["wind_direction"] = windDirection;
+  buff["solar_radiation"] = solarRadiation;
+  buff["temperature"] = temperature;
+  buff["humidity"] = humidity;
+  buff["pressure"] = pressure;
 
   serializeJson(buff, jsonParams);
   http.begin(url);
   http.addHeader("Content-Type", "application/json");
+  http.addHeader("apikey", supabaseKey);
   int statusCode = http.POST(jsonParams);
   response = http.getString();
 
-  if (statusCode == 200) {
-  Serial.println("Post Method Success!");
-
+  if (statusCode == 201) {
+    Serial.println("Post Method Success!");
   } else {
     Serial.println("Post Method Failed!");
+    Serial.println("HTTP Response code: " + String(statusCode));
+    Serial.println("Response: " + response);
   }
-}
 
-void postToGoogleSheets() {
-  Serial.println("Sending data sensors to Google Sheets...");
-
-  FirebaseJson response;
-  FirebaseJson valueRange;
-
-  // Get timestamp
-  String formattedDate = getFormattedDate();
-
-  valueRange.add("majorDimension", "COLUMNS");
-  valueRange.set("values/[0]/[0]", formattedDate);
-  valueRange.set("values/[1]/[0]", windSpeed);
-  valueRange.set("values/[2]/[0]", windDirection);
-  valueRange.set("values/[3]/[0]", solarRadiation);
-  valueRange.set("values/[4]/[0]", temperature);
-  valueRange.set("values/[5]/[0]", humidity);
-  valueRange.set("values/[6]/[0]", pressure);
-  
-  // For Google Sheet API ref doc, go to https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.values/append
-  // Append values to the spreadsheet
-  bool success = GSheet.values.append(&response /* returned response */, spreadsheetId /* spreadsheet Id to append */, "Sheet1!A1" /* range to append */, &valueRange /* data range to append */);
-  if (success){
-    response.toString(Serial, true);
-    valueRange.clear();
-    Serial.println("Post Method Success!");
-  }
-  else{
-    Serial.println(GSheet.errorReason());
-    Serial.println("Post Method Failed!");
-  }
-}
-
-void tokenStatusCallback(TokenInfo info){
-    if (info.status == token_status_error){
-        GSheet.printf("Token info: type = %s, status = %s\n", GSheet.getTokenType(info).c_str(), GSheet.getTokenStatus(info).c_str());
-        GSheet.printf("Token error: %s\n", GSheet.getTokenError(info).c_str());
-    }
-    else{
-        GSheet.printf("Token info: type = %s, status = %s\n", GSheet.getTokenType(info).c_str(), GSheet.getTokenStatus(info).c_str());
-    }
+  http.end();
 }
 
 // RK100-02 Sensor
 void readWindSpeed() {
- if(modbus.readHoldingRegisters(1, 0, holdingRegisterWindSpeed, 1)){
-    windSpeed = holdingRegisterWindSpeed[0]/10.0;
+  if (modbus.readHoldingRegisters(1, 0, holdingRegisterWindSpeed, 1)) {
+    windSpeed = holdingRegisterWindSpeed[0] / 10.0;
     Serial.print("Wind Speed: ");
     Serial.print(windSpeed);
     Serial.println(" m/s");
- }
- else processError();
+  } else {
+    processError();
+  }
 }
 
 // RK110-02 Sensor
 void readWindDirection() {
-  if(modbus.readHoldingRegisters(2, 0, holdingRegisterWindDirection, 1)){
+  if (modbus.readHoldingRegisters(2, 0, holdingRegisterWindDirection, 1)) {
     windDirection = holdingRegisterWindDirection[0];
     Serial.print("Wind Direction: ");
     Serial.print(windDirection);
     Serial.println(" degree");
- }
- else processError();
+  } else {
+    processError();
+  }
 }
 
 // RK200-04 Sensor
 void readSolarRadiation() {
-    if(modbus.readHoldingRegisters(6, 0, holdingRegisterSolarRadiation, 1)){
+  if (modbus.readHoldingRegisters(6, 0, holdingRegisterSolarRadiation, 1)) {
     solarRadiation = holdingRegisterSolarRadiation[0];
-    Serial.print("Solar Radiation : ");
+    Serial.print("Solar Radiation: ");
     Serial.print(solarRadiation);
     Serial.println(" W/m²");
- }
- else processError();
+  } else {
+    processError();
+  }
 }
 
 // RK330-01 Sensor
 void readClimateData() {
-  if(modbus.readHoldingRegisters(3, 0, holdingRegisterClimate, 3)){
-    temperature = holdingRegisterClimate[0]/10.0;
-    humidity = holdingRegisterClimate[1]/10.0;
-    pressure = holdingRegisterClimate[2]/10.0;
+  if (modbus.readHoldingRegisters(3, 0, holdingRegisterClimate, 3)) {
+    temperature = holdingRegisterClimate[0] / 10.0;
+    humidity = holdingRegisterClimate[1] / 10.0;
+    pressure = holdingRegisterClimate[2] / 10.0;
 
     Serial.print("Temperature: ");
     Serial.print(temperature);
@@ -219,8 +170,9 @@ void readClimateData() {
     Serial.print("Pressure: ");
     Serial.print(pressure);
     Serial.println(" mbar");
- }
- else processError();
+  } else {
+    processError();
+  }
 }
 
 void connectWifi() {
@@ -239,9 +191,9 @@ void connectWifi() {
   Serial.println(WiFi.localIP());
 }
 
-void AutoReconnectWiFi(){
-  if (WiFi.status()!=WL_CONNECTED){
-    Serial.println("Wifi Disconnect");
+void AutoReconnectWiFi() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi Disconnected");
     connectWifi();
   }
 }
@@ -260,8 +212,7 @@ void processError() {
   if (modbus.getTimeoutFlag()) {
     Serial.println(F("Connection timed out"));
     modbus.clearTimeoutFlag();
-  }
-  else if (modbus.getExceptionResponse() != 0) {
+  } else if (modbus.getExceptionResponse() != 0) {
     Serial.print(F("Received exception response: "));
     Serial.print(modbus.getExceptionResponse());
     switch (modbus.getExceptionResponse()) {
@@ -282,8 +233,7 @@ void processError() {
         break;
     }
     modbus.clearExceptionResponse();
-  }
-  else {
+  } else {
     Serial.println("An error occurred");
   }
 }
@@ -294,6 +244,6 @@ String getFormattedDate() {
     return "Failed to obtain time";
   }
   char buffer[80];
-  strftime(buffer, 80, "%Y-%m-%d %H:%M:%S ", &timeinfo);
+  strftime(buffer, 80, "%Y-%m-%d %H:%M:%S", &timeinfo);
   return String(buffer);
 }
