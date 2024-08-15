@@ -1,9 +1,11 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <HttpClient.h>
 #include <ArduinoJson.h>
 #include <ModbusRTUMaster.h>
 #include <time.h>
 #include <HardwareSerial.h>
+#include <HTTPClient.h>
 
 //RS485 pin definition
 const uint8_t dePin = 4;
@@ -12,8 +14,8 @@ const uint8_t RXpin = 16;
 const uint8_t TXpin = 17;
 
 // WiFi Declare
-String wifiSSID = "Xiaomi";
-String wifiPassword = "bijibijian";
+String wifiSSID = "WIFI";
+String wifiPassword = "PASS";
 
 // NTP Configuration
 const char* ntpServer = "pool.ntp.org";
@@ -21,8 +23,8 @@ const long gmtOffset_sec = 6 * 3600;  // WIB Time, Indonesia
 const int daylightOffset_sec = 3600;
 
 // Supabase API credentials
-const char* supabaseUrl = "https://fxmhhmvyattgrgdkbqbh.supabase.co";
-const char* supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ4bWhobXZ5YXR0Z3JnZGticWJoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjI2MDQ5NzMsImV4cCI6MjAzODE4MDk3M30.Ev7Yr7xPc965XT4TCSystOf18pMViyKpQhTrBtyULzA";
+const char* supabaseUrl = "https://XXX.supabase.co";
+const char* supabaseKey = "KEY";
 String endpoint = "/rest/v1/sensor_data";
 
 // Making modbus object
