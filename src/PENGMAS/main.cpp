@@ -21,12 +21,6 @@ const char* ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = 6 * 3600;  //WIB Time, Indonesia
 const int daylightOffset_sec = 3600;
 
-// Supabase API credentials
-const char* supabaseUrl = "https://supabase.co";
-const char* supabaseKey = "YOUR SUPABASE KEY";
-                          
-String endpoint = "/rest/v1/sensor_data";
-
 // Making modbus object
 ModbusRTUMaster modbus(mySerial, dePin);
 uint16_t holdingRegisterWindSpeed [1] = {0};    // The data read from the wind speed register
@@ -52,7 +46,8 @@ float NO2;
 float O3;
 
 // Function Declare
-void postHTTP();
+void postHTTP_Weather();
+void postHTTP_AirQuality();
 void readWindSpeed();
 void readWindDirection();
 void readSolarRadiation();
@@ -68,7 +63,7 @@ String getFormattedDate();
 
 //Setting interval time
 unsigned long previousMillis = 0;
-const long interval = 1000;
+const long interval = 600000;
 
 void setup() {
   Serial.begin(9600);
@@ -95,50 +90,131 @@ void loop() {
     delay(300);
     readGas();
     delay(300);
-    postHTTP();
+    postHTTP_Weather();
+    postHTTP_AirQuality();
   }
 }
 
 void postHTTP() {
   Serial.println("Sending data sensors...");
-  String url = String(supabaseUrl) + endpoint;
+  String url = "YOUR API URL";
   HTTPClient http;
   String response;
 
-  StaticJsonDocument<1000> buff;
+  StaticJsonDocument<500> buff;
   String jsonParams;
   String formattedDate = getFormattedDate();
+  JsonArray weatherArray = buff.createNestedArray("sensor");
 
-  buff["date"] = formattedDate;
-  buff["windSpeed"] = String(windSpeed);
-  buff["windDirection"] = String(windDirection);
-  buff["solarRadiation"] = String(solarRadiation);
-  buff["temperature"] = String(temperature);
-  buff["humidity"] = String(humidity);
-  buff["pressure"] = String(pressure);
-  buff["rainfall"] = String(rainfall);
-  buff["PM2.5"] = String(PM2);
-  buff["PM10"] = String(PM10);
-  buff["CO2"] = String(CO2);
-  buff["O2"] = String(O2);
-  buff["SO2"] = String(SO2);
-  buff["NO2"] = String(NO2);
-  buff["O3"] = String(O3);
+  JsonObject weather1 = weatherArray.createNestedObject();
+  weather1["sensorCode"] = "TEMP";
+  weather1["value"] = temperature;
+
+  JsonObject weather2 = weatherArray.createNestedObject();
+  weather2["sensorCode"] = "HUM";
+  weather2["value"] = humidity;
+
+  JsonObject weather3 = weatherArray.createNestedObject();
+  weather3["sensorCode"] = "SOLAR";
+  weather3["value"] = solarRadiation;
+
+  JsonObject weather4 = weatherArray.createNestedObject();
+  weather4["sensorCode"] = "RAINFL";
+  weather4["value"] = rainfall;
+
+  JsonObject weather5 = weatherArray.createNestedObject();
+  weather5["sensorCode"] = "PRESS";
+  weather5["value"] = pressure;
+
+  JsonObject weather6 = weatherArray.createNestedObject();
+  weather6["sensorCode"] = "WINDSPD";
+  weather6["value"] = windSpeed;
+
+  JsonObject weather7 = weatherArray.createNestedObject();
+  weather7["sensorCode"] = "WINDDIR";
+  weather7["value"] = windDirection;
 
   serializeJson(buff, jsonParams);
+  Serial.println("Generated JSON Data: ");
+  Serial.println(jsonParams);  
+
   http.begin(url);
-  http.addHeader("apikey", supabaseKey);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("x-api-key", "API-KEY-VALUE");
+
   int statusCode = http.POST(jsonParams);
   response = http.getString();
 
   if (statusCode == 201) {
-  Serial.println("Post Method Success!");
-
+    Serial.println("Post Method Success!");
   } else {
     Serial.println("Post Method Failed!");
     Serial.println("HTTP Response code: " + String(statusCode));
     Serial.println("Response: " + response);
   }
+  http.end();
+}
+
+void postHTTP_AirQuality() {
+  Serial.println("Sending air quality data...");
+
+  // URL untuk endpoint air quality
+  String url = "YOUR URL";
+  HTTPClient http;
+  String response;
+  StaticJsonDocument<500> buff;
+  String jsonParams;
+
+  JsonArray Airquality_Array = buff.createNestedArray("sensor");
+
+  JsonObject sensor1 = Airquality_Array.createNestedObject();
+  sensor1["sensorCode"] = "SO2";
+  sensor1["value"] = SO2;
+
+  JsonObject sensor2 = Airquality_Array.createNestedObject();
+  sensor2["sensorCode"] = "CO2";
+  sensor2["value"] = CO2;
+
+  JsonObject sensor3 = Airquality_Array.createNestedObject();
+  sensor3["sensorCode"] = "O2";
+  sensor3["value"] = O2;
+
+  JsonObject sensor4 = Airquality_Array.createNestedObject();
+  sensor4["sensorCode"] = "PM2.5";
+  sensor4["value"] = PM2;
+
+  JsonObject sensor5 = Airquality_Array.createNestedObject();
+  sensor5["sensorCode"] = "PM10";
+  sensor5["value"] = PM10;
+
+  JsonObject sensor6 = Airquality_Array.createNestedObject();
+  sensor6["sensorCode"] = "O3";
+  sensor6["value"] = O3;
+
+  JsonObject sensor7 = Airquality_Array.createNestedObject();
+  sensor7["sensorCode"] = "NO2";
+  sensor7["value"] = NO2;
+
+  serializeJson(buff, jsonParams);
+
+  Serial.println("Generated JSON Data: ");
+  Serial.println(jsonParams);  
+
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("x-api-key", "API-KEY-AIR-QUALITY");
+
+  int statusCode = http.POST(jsonParams);
+  response = http.getString();
+
+  if (statusCode == 201) {
+    Serial.println("Post Method Success!");
+  } else {
+    Serial.println("Post Method Failed!");
+    Serial.println("HTTP Response code: " + String(statusCode));
+    Serial.println("Response: " + response);
+  }
+
   http.end();
 }
 
@@ -159,7 +235,7 @@ void readWindDirection() {
     windDirection = holdingRegisterWindDirection[0];
     Serial.print("Wind Direction: ");
     Serial.print(windDirection, 2);
-    Serial.println(" degree");
+    Serial.println(" °");
  }
  else processError();
 }
